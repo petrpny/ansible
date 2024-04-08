@@ -1,0 +1,17 @@
+---
+-
+  name: Sending IOS Commands
+  hosts: all
+  gather_facts: no
+    
+  tasks:
+    
+  - name: Sending a few simple Cisco IOS commands
+    cisco.ios.ios_command:
+      commands:
+        - show version
+        - show ip int brief
+        - show run | section line
+    register: output
+
+  - debug: var=output.stdout_lines

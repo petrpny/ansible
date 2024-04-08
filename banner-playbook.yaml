@@ -1,0 +1,17 @@
+---
+-
+# name: Change banner
+  hosts: all 
+  gather_facts: no
+  
+  tasks:
+  - name: Cisco banner
+    cisco.ios.ios_banner:
+      banner: login
+      text: |
+       ^__^         /
+       (oo)\_______/  _________
+       (__)\       )=(  ____|_ \_____
+           ||----w |  \ \     \_____ |
+           ||     ||   ||           ||
+      state: present
