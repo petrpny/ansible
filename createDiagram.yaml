@@ -1,0 +1,90 @@
+---
+- name: Create Network Diagram
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  become: yes
+
+  vars:
+    network_range: "192.168.1.0/24"
+    router_ip: "192.168.1.1"
+    diagram_file: "network_diagram.png"
+    python_interpreter: "/usr/bin/python3"
+    pip_executable: "/usr/bin/pip3"
+
+  tasks:
+    - name: Check if nmap is installed
+      command: nmap --version
+      register: nmap_check
+      failed_when: nmap_check.rc != 0
+      changed_when: false
+      ignore_errors: true
+
+    - name: Fail if nmap is not installed
+      fail:
+        msg: "nmap is not installed. Please install it (e.g., 'sudo apt install nmap' on Ubuntu)."
+      when: nmap_check.rc != 0
+
+    - name: Install required Python packages
+      pip:
+        name:
+          - python-nmap
+          - networkx
+          - matplotlib
+        state: present
+        executable: "{{ pip_executable }}"
+      become: yes
+      register: pip_install
+      failed_when: pip_install.failed
+
+    - name: Create Python script for network scanning and diagramming
+      copy:
+        dest: "/tmp/network_diagram.py"
+        content: |
+          import nmap
+          import networkx as nx
+          import matplotlib.pyplot as plt
+
+          # Initialize scanner
+          nm = nmap.PortScanner()
+
+          # Scan the network
+          nm.scan(hosts='{{ network_range }}', arguments='-sn')
+
+          # Create graph
+          G = nx.Graph()
+
+          # Add nodes
+          for host in nm.all_hosts():
+              hostname = nm[host].hostname() or host
+              G.add_node(host, label=hostname)
+
+          # Add edges (simple star topology assumption)
+          router = '{{ router_ip }}'
+          for host in nm.all_hosts():
+              if host != router:
+                  G.add_edge(host, router)
+
+          # Draw and save diagram
+          pos = nx.spring_layout(G)
+          plt.figure(figsize=(10, 8))
+          nx.draw(G, pos, with_labels=True, labels=nx.get_node_attributes(G, 'label'),
+                  node_color='lightblue', node_size=500, font_size=10)
+          nx.draw_networkx_edges(G, pos, edge_color='gray')
+          plt.title("Network Topology")
+          plt.savefig('{{ diagram_file }}')
+      become: yes
+
+    - name: Execute the Python script
+      command: "{{ python_interpreter }} /tmp/network_diagram.py"
+      args:
+        chdir: "{{ playbook_dir }}"
+      become: yes
+      register: script_execution
+      failed_when: script_execution.rc != 0
+
+    - name: Clean up script file
+      file:
+        path: "/tmp/network_diagram.py"
+        state: absent
+      become: yes
